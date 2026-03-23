@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+    }
+
+    .login-card {
+      background: #fff;
+      padding: 2rem;
+      width: 100%;
+      max-width: 360px;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    }
+
+    .login-card h2 {
+      margin-bottom: 1.5rem;
+      text-align: center;
+      color: #333;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.4rem;
+      font-size: 0.9rem;
+      color: #555;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 0.6rem 0.7rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 0.95rem;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .login-btn {
+      width: 100%;
+      padding: 0.7rem;
+      margin-top: 0.5rem;
+      border: none;
+      border-radius: 6px;
+      background: #667eea;
+      color: #fff;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .login-btn:hover {
+      background: #5a6fdc;
+    }
+
+    .extra {
+      margin-top: 1rem;
+      text-align: center;
+      font-size: 0.85rem;
+      color: #666;
+    }
+
+    .extra a {
+      color: #667eea;
+      text-decoration: none;
+    }
+
+    .extra a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h2>Login</h2>
+    {% if messages%}
+       {%for message in messages%}
+         <h2 style="color: red;">{{message}}</h2>
+       {% endfor %}
+    {% endif %}
+    <form method="POST">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="Name">USername</label>
+        <input type="text" id="email" name="Uname" placeholder="Enter your Username" required />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="pass" placeholder="Enter your password" required />
+      </div>
+
+      <button type="submit" class="login-btn">Sign In</button>
+    </form>
+
+    
+  </div>
+</body>
+</html>
