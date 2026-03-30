@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    body {
+      background: #f4f6f9;
+    }
+
+    .card-box {
+      border-radius: 15px;
+      transition: 0.3s;
+    }
+
+    .card-box:hover {
+      transform: translateY(-5px);
+    }
+
+    .income { background: #d1f7d6; }
+    .expense { background: #ffd6d6; }
+    .balance { background: #d6e4ff; }
+  </style>
+</head>
+
+<body>
+
+<div class="container py-4">
+
+  <!-- Header -->
+  <div class="mb-4">
+    <h2 class="fw-bold">👋 Welcome, {{ user.username }}</h2>
+    <p class="text-muted">Track your income and expenses easily</p>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="row g-3 mb-4">
+
+    <div class="col-md-4">
+      <div class="card card-box income p-3 shadow-sm">
+        <h5>💰 Total Income</h5>
+        <h3>${{ total_income }}</h3>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card card-box expense p-3 shadow-sm">
+        <h5>💸 Total Expenses</h5>
+        <h3>${{ total_expense }}</h3>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card card-box balance p-3 shadow-sm">
+        <h5>📊 Balance</h5>
+        <h3>${{ balance }}</h3>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="row">
+
+    <!-- Add Income -->
+    <div class="col-md-6">
+      <div class="card shadow-sm p-3 mb-4">
+        <h5 class="mb-3">➕ Add Income</h5>
+
+        <form method="POST" action="{% url 'add_income' %}">
+          {% csrf_token %}
+
+          <select name="category" class="form-select mb-2" required>
+            {% for cat in income_categories %}
+              <option value="{{ cat.id }}">{{ cat.name }}</option>
+            {% endfor %}
+          </select>
+
+          <input type="number" name="amount" class="form-control mb-2" placeholder="Amount" required>
+
+          <input type="date" name="date" class="form-control mb-2" required>
+
+          <button class="btn btn-success w-100">Add Income</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Add Expense -->
+    <div class="col-md-6">
+      <div class="card shadow-sm p-3 mb-4">
+        <h5 class="mb-3">➖ Add Expense</h5>
+
+        <form method="POST" action="{% url 'add_expense' %}">
+          {% csrf_token %}
+
+          <select name="category" class="form-select mb-2" required>
+            {% for cat in expense_categories %}
+              <option value="{{ cat.id }}">{{ cat.name }}</option>
+            {% endfor %}
+          </select>
+
+          <input type="number" name="amount" class="form-control mb-2" placeholder="Amount" required>
+
+          <input type="date" name="date" class="form-control mb-2" required>
+
+          <button class="btn btn-danger w-100">Add Expense</button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Transactions Table -->
+  <div class="card shadow-sm p-3">
+    <h5 class="mb-3">📜 Recent Transactions</h5>
+
+    <div class="table-responsive">
+      <table class="table table-striped table-hover">
+        <thead class="table-dark">
+          <tr>
+            <th>#</th>
+            <th>Category</th>
+            <th>Type</th>
+            <th>Amount</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for t in transactions %}
+          <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ t.category.name }}</td>
+            <td>
+              {% if t.transaction_type == "income" %}
+                <span class="badge bg-success">Income</span>
+              {% else %}
+                <span class="badge bg-danger">Expense</span>
+              {% endif %}
+            </td>
+            <td>${{ t.amount }}</td>
+            <td>{{ t.date }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+</div>
+
+</body>
+</html>
