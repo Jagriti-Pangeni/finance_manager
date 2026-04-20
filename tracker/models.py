@@ -14,7 +14,7 @@ class UserProfile(models.Model):
 class Category(models.Model):
     CATEGORY_TYPES = (
         ('income', 'Income'),
-        ('expense', 'Expense'),
+        ('expense', 'Expense')
     )
 
     name = models.CharField(max_length=100)
