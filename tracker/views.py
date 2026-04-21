@@ -4,6 +4,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .models import Transaction, Category,Account
 from django.utils import timezone
+from django.contrib.auth.models import User
+from django.contrib.auth import login
+
 
 
 # Create your views here.
@@ -26,9 +29,50 @@ def loginpage(request):
 
     return render(request, "tracker/login.html")  # Render login form for GET requests
 def register(request):
+    if request.method == "POST":
+        name = request.POST.get("name")
+        email = request.POST.get("eMail")
+        password = request.POST.get("password")
+        confirm_password = request.POST.get("conf_password")
 
-    return render(request,"tracker/register.html")
+        if password != confirm_password:
+            messages.error(request, "Passwords do not match")
+            return redirect('register')
 
+        if User.objects.filter(username=name).exists():
+            messages.error(request, "Username already exists")
+            return redirect('register')
+
+        # ✅ Create user
+        user = User.objects.create_user(
+            username=name,
+            email=email,
+            password=password
+        )
+
+        # ✅ Create default account
+        Account.objects.create(
+            user=user,
+            name="Main Account",
+            account_type="cash",
+            balance=0
+        )
+
+        # ✅ Create default categories (IMPORTANT FIX)
+        Category.objects.bulk_create([
+            Category(name="Salary", type="income", user=user),
+            Category(name="Freelance", type="income", user=user),
+            Category(name="Food", type="expense", user=user),
+            Category(name="Transport", type="expense", user=user),
+            Category(name="Bills", type="expense", user=user),
+        ])
+
+        # ✅ Login user
+        login(request, user)
+
+        return redirect('dashboard')
+
+    return render(request, "tracker/register.html")
 
 @login_required(login_url='/login/')
 def dashboard(request):
