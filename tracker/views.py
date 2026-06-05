@@ -1,3 +1,4 @@
+import re
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
@@ -30,35 +31,113 @@ def loginpage(request):
     return render(request, "tracker/login.html")  # Render login form for GET requests
 def register(request):
     if request.method == "POST":
-        name = request.POST.get("name")
-        email = request.POST.get("eMail")
-        password = request.POST.get("password")
-        confirm_password = request.POST.get("conf_password")
+        name = request.POST.get("name", "").strip()
+        email = request.POST.get("eMail", "").strip().lower()
+        password = request.POST.get("password", "")
+        confirm_password = request.POST.get("conf_password", "")
+
+        # ── USERNAME VALIDATION ──────────────────────────────────────────
+        if not name:
+            messages.error(request, "Username is required.")
+            return redirect('register')
+
+        if len(name) < 3 or len(name) > 20:
+            messages.error(request, "Username must be between 3 and 20 characters.")
+            return redirect('register')
+
+        if not re.match(r'^[a-zA-Z0-9_.-]+$', name):
+            messages.error(request, "Username can only contain letters, numbers, underscores (_), dots (.), and hyphens (-).")
+            return redirect('register')
+
+        if re.match(r'^[_.\-]', name) or re.match(r'[_.\-]$', name):
+            messages.error(request, "Username cannot start or end with a special character.")
+            return redirect('register')
+
+        if re.search(r'[_.\-]{2,}', name):
+            messages.error(request, "Username cannot have consecutive special characters.")
+            return redirect('register')
+
+        RESERVED_USERNAMES = ['admin', 'root', 'superuser', 'administrator', 'support', 'help', 'null', 'undefined']
+        if name.lower() in RESERVED_USERNAMES:
+            messages.error(request, "This username is reserved. Please choose another.")
+            return redirect('register')
+
+        if User.objects.filter(username__iexact=name).exists():
+            messages.error(request, "Username already exists.")
+            return redirect('register')
+
+        # ── EMAIL VALIDATION ─────────────────────────────────────────────
+        if not email:
+            messages.error(request, "Email is required.")
+            return redirect('register')
+
+        email_regex = r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_regex, email):
+            messages.error(request, "Enter a valid email address.")
+            return redirect('register')
+
+        BLOCKED_EMAIL_DOMAINS = ['tempmail.com', 'throwaway.email', 'mailinator.com', 'guerrillamail.com']
+        email_domain = email.split('@')[-1]
+        if email_domain in BLOCKED_EMAIL_DOMAINS:
+            messages.error(request, "Disposable email addresses are not allowed.")
+            return redirect('register')
+
+        if User.objects.filter(email__iexact=email).exists():
+            messages.error(request, "An account with this email already exists.")
+            return redirect('register')
+
+        # ── PASSWORD VALIDATION ──────────────────────────────────────────
+        if not password:
+            messages.error(request, "Password is required.")
+            return redirect('register')
+
+        if len(password) < 8:
+            messages.error(request, "Password must be at least 8 characters long.")
+            return redirect('register')
+
+        if len(password) > 128:
+            messages.error(request, "Password must not exceed 128 characters.")
+            return redirect('register')
+
+        if not re.search(r'[A-Z]', password):
+            messages.error(request, "Password must contain at least one uppercase letter.")
+            return redirect('register')
+
+        if not re.search(r'[a-z]', password):
+            messages.error(request, "Password must contain at least one lowercase letter.")
+            return redirect('register')
+
+        if not re.search(r'\d', password):
+            messages.error(request, "Password must contain at least one number.")
+            return redirect('register')
+
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>_\-]', password):
+            messages.error(request, "Password must contain at least one special character.")
+            return redirect('register')
+
+        COMMON_PASSWORDS = ['password', '12345678', 'password1', 'qwerty123', 'iloveyou']
+        if password.lower() in COMMON_PASSWORDS:
+            messages.error(request, "This password is too common. Please choose a stronger one.")
+            return redirect('register')
+
+        if name.lower() in password.lower():
+            messages.error(request, "Password should not contain your username.")
+            return redirect('register')
 
         if password != confirm_password:
-            messages.error(request, "Passwords do not match")
+            messages.error(request, "Passwords do not match.")
             return redirect('register')
 
-        if User.objects.filter(username=name).exists():
-            messages.error(request, "Username already exists")
-            return redirect('register')
-
-        # ✅ Create user
+        # ── CREATE USER ──────────────────────────────────────────────────
         user = User.objects.create_user(
             username=name,
             email=email,
             password=password
         )
+        user.save()
+        messages.success(request, "Account created successfully! Please log in.")
 
-        # ✅ Create default account
-        Account.objects.create(
-            user=user,
-            name="Main Account",
-            account_type="cash",
-            balance=0
-        )
-
-        # ✅ Create default categories (IMPORTANT FIX)
+        # Create default categories (IMPORTANT FIX)
         Category.objects.bulk_create([
             Category(name="Salary", type="income", user=user),
             Category(name="Freelance", type="income", user=user),
@@ -67,7 +146,7 @@ def register(request):
             Category(name="Bills", type="expense", user=user),
         ])
 
-        # ✅ Login user
+        # Login user
         login(request, user)
 
         return redirect('dashboard')
@@ -135,4 +214,3 @@ def add_expense(request):
         )
 
     return redirect('dashboard')
-
