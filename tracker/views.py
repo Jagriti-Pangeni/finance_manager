@@ -7,7 +7,8 @@ from .models import Transaction, Category,Account
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.contrib.auth import login
-
+from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation
 
 
 # Create your views here.
@@ -177,19 +178,81 @@ def add_income(request):
     if request.method == "POST":
         category_id = request.POST.get("category")
         amount = request.POST.get("amount")
-        date = request.POST.get("date")
+        date_str = request.POST.get("date")
 
-        category = Category.objects.get(id=category_id)
+        # ── AMOUNT VALIDATION ────────────────────────────────────────────
+        if not amount:
+            messages.error(request, "Amount is required.")
+            return redirect('dashboard')
+
+        try:
+            amount = Decimal(amount)
+        except InvalidOperation:
+            messages.error(request, "Enter a valid numeric amount.")
+            return redirect('dashboard')
+
+        if amount <= 0:
+            messages.error(request, "Income amount must be greater than zero.")
+            return redirect('dashboard')
+
+        if amount > Decimal('9999999.99'):
+            messages.error(request, "Income amount is unrealistically large. Please enter a valid amount.")
+            return redirect('dashboard')
+
+        if round(amount, 2) != amount:
+            messages.error(request, "Amount can have at most 2 decimal places.")
+            return redirect('dashboard')
+
+        # ── DATE VALIDATION ──────────────────────────────────────────────
+        if not date_str:
+            messages.error(request, "Date is required.")
+            return redirect('dashboard')
+
+        try:
+            income_date = date.fromisoformat(date_str)  # expects YYYY-MM-DD
+        except ValueError:
+            messages.error(request, "Enter a valid date in YYYY-MM-DD format.")
+            return redirect('dashboard')
+
+        today = date.today()
+        max_past_days = 365  # allow up to 1 year back
+        max_future_days = 1  # allow only tomorrow at most
+
+        if income_date > today + timedelta(days=max_future_days):
+            messages.error(request, "Income date cannot be more than 1 day in the future.")
+            return redirect('dashboard')
+
+        if income_date < today - timedelta(days=max_past_days):
+            messages.error(request, "Income date cannot be more than 1 year in the past.")
+            return redirect('dashboard')
+
+        # ── CATEGORY VALIDATION ──────────────────────────────────────────
+        if not category_id:
+            messages.error(request, "Category is required.")
+            return redirect('dashboard')
+
+        try:
+            category = Category.objects.get(id=category_id)
+        except Category.DoesNotExist:
+            messages.error(request, "Selected category does not exist.")
+            return redirect('dashboard')
+
+        # ── ACCOUNT VALIDATION ───────────────────────────────────────────
         account = Account.objects.filter(user=request.user).first()
+        if not account:
+            messages.error(request, "No account found. Please create an account first.")
+            return redirect('dashboard')
 
+        # ── CREATE TRANSACTION ───────────────────────────────────────────
         Transaction.objects.create(
             user=request.user,
             account=account,
             category=category,
             amount=amount,
             transaction_type='income',
-            date=date
+            date=income_date
         )
+        messages.success(request, f"Income of {amount} added successfully.")
 
     return redirect('dashboard')
 
@@ -199,18 +262,85 @@ def add_expense(request):
     if request.method == "POST":
         category_id = request.POST.get("category")
         amount = request.POST.get("amount")
-        date = request.POST.get("date")
+        date_str = request.POST.get("date")
 
-        category = Category.objects.get(id=category_id)
+        # ── AMOUNT VALIDATION ────────────────────────────────────────────
+        if not amount:
+            messages.error(request, "Amount is required.")
+            return redirect('dashboard')
+
+        try:
+            amount = Decimal(amount)
+        except InvalidOperation:
+            messages.error(request, "Enter a valid numeric amount.")
+            return redirect('dashboard')
+
+        if amount <= 0:
+            messages.error(request, "Expense amount must be greater than zero.")
+            return redirect('dashboard')
+
+        if amount > Decimal('9999999.99'):
+            messages.error(request, "Expense amount is unrealistically large. Please enter a valid amount.")
+            return redirect('dashboard')
+
+        if round(amount, 2) != amount:
+            messages.error(request, "Amount can have at most 2 decimal places.")
+            return redirect('dashboard')
+
+        # ── DATE VALIDATION ──────────────────────────────────────────────
+        if not date_str:
+            messages.error(request, "Date is required.")
+            return redirect('dashboard')
+
+        try:
+            expense_date = date.fromisoformat(date_str)
+        except ValueError:
+            messages.error(request, "Enter a valid date in YYYY-MM-DD format.")
+            return redirect('dashboard')
+
+        today = date.today()
+        max_past_days = 365  # allow up to 1 year back
+        max_future_days = 1  # allow only tomorrow at most
+
+        if expense_date > today + timedelta(days=max_future_days):
+            messages.error(request, "Expense date cannot be more than 1 day in the future.")
+            return redirect('dashboard')
+
+        if expense_date < today - timedelta(days=max_past_days):
+            messages.error(request, "Expense date cannot be more than 1 year in the past.")
+            return redirect('dashboard')
+
+        # ── CATEGORY VALIDATION ──────────────────────────────────────────
+        if not category_id:
+            messages.error(request, "Category is required.")
+            return redirect('dashboard')
+
+        try:
+            category = Category.objects.get(id=category_id)
+        except Category.DoesNotExist:
+            messages.error(request, "Selected category does not exist.")
+            return redirect('dashboard')
+
+        # ── ACCOUNT VALIDATION ───────────────────────────────────────────
         account = Account.objects.filter(user=request.user).first()
+        if not account:
+            messages.error(request, "No account found. Please create an account first.")
+            return redirect('dashboard')
 
+        # ── BALANCE CHECK ─────────────────────────────────────────────────
+        if account.balance < amount:
+            messages.error(request, f"Insufficient balance. Your current balance is {account.balance}.")
+            return redirect('dashboard')
+
+        # ── CREATE TRANSACTION ───────────────────────────────────────────
         Transaction.objects.create(
             user=request.user,
             account=account,
             category=category,
             amount=amount,
             transaction_type='expense',
-            date=date
+            date=expense_date
         )
+        messages.success(request, f"Expense of {amount} added successfully.")
 
     return redirect('dashboard')
