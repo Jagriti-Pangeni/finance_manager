@@ -64,8 +64,7 @@
           <span class="input-group-text">
             <i class="bi bi-person"></i>
           </span>
-          <input type="text" name="username" class="form-control" placeholder="Enter username" required>
-        </div>
+          <input type="text" name="username" class="form-control" placeholder="Enter username" value="{{ username|default:'' }}" required>
       </div>
 
       <!-- Password -->
