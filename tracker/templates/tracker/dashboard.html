@@ -56,21 +56,21 @@
     <div class="col-md-4">
       <div class="card card-box income p-3 shadow-sm">
         <h5>💰 Total Income</h5>
-        <h3>${{ total_income }}</h3>
+        <h3>Rs.{{ total_income }}</h3>
       </div>
     </div>
 
     <div class="col-md-4">
       <div class="card card-box expense p-3 shadow-sm">
         <h5>💸 Total Expenses</h5>
-        <h3>${{ total_expense }}</h3>
+        <h3>Rs.{{ total_expense }}</h3>
       </div>
     </div>
 
     <div class="col-md-4">
       <div class="card card-box balance p-3 shadow-sm">
         <h5>📊 Balance</h5>
-        <h3>${{ balance }}</h3>
+        <h3>Rs.{{ balance }}</h3>
       </div>
     </div>
 
@@ -154,7 +154,7 @@
                 <span class="badge bg-danger">Expense</span>
               {% endif %}
             </td>
-            <td>${{ t.amount }}</td>
+            <td>Rs.{{ t.amount }}</td>
             <td>{{ t.date }}</td>
           </tr>
           {% endfor %}

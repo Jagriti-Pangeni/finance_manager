@@ -123,6 +123,8 @@ def register(request):
         user = User.objects.create_user(username=name, email=email, password=password)
         user.save()
 
+        Account.objects.create(user=user, balance=Decimal('0.00'))
+
         Category.objects.bulk_create([
             Category(name="Salary", type="income", user=user),
             Category(name="Freelance", type="income", user=user),
@@ -229,6 +231,8 @@ def add_income(request):
             transaction_type='income',
             date=income_date
         )
+        account.balance += amount
+        account.save()
         messages.success(request, f"Income of {amount} added successfully.")
 
     return redirect('dashboard')
