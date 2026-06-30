@@ -3,12 +3,13 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .models import Transaction, Category, Account
+from .models import UserProfile, Transaction, Category, Account
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.contrib.auth import login
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
+from django.contrib.auth import logout
 
 
 def home(request):
@@ -236,6 +237,11 @@ def add_income(request):
         messages.success(request, f"Income of {amount} added successfully.")
 
     return redirect('dashboard')
+@login_required(login_url='/login/')
+def logout_user(request):
+    logout(request)
+    messages.success(request, "You have been logged out successfully.")
+    return redirect("login")
 
 
 @login_required(login_url='/login/')
@@ -314,5 +320,77 @@ def add_expense(request):
             date=expense_date
         )
         messages.success(request, f"Expense of {amount} added successfully.")
+        
 
     return redirect('dashboard')
+@login_required(login_url="/login/")
+def add_category(request):
+
+    if request.method == "POST":
+        name = request.POST.get("name").strip()
+        category_type = request.POST.get("type")
+
+        if Category.objects.filter(
+            user=request.user,
+            name__iexact=name,
+            type=category_type
+        ).exists():
+            messages.error(request, "Category already exists.")
+            return redirect("dashboard")
+
+        Category.objects.create(
+            user=request.user,
+            name=name,
+            type=category_type
+        )
+
+        messages.success(request, "Category added successfully.")
+
+    return redirect("dashboard")
+@login_required(login_url="/login/")
+def profile(request):
+
+    profile, created = UserProfile.objects.get_or_create(
+        user=request.user
+    )
+
+    return render(request,"tracker/profile.html",{
+        "profile":profile
+    })
+
+@login_required(login_url="/login/")
+def profile(request):
+
+    if request.method == "POST":
+
+        request.user.username = request.POST.get("username")
+        request.user.email = request.POST.get("email")
+
+        request.user.save()
+
+        messages.success(request, "Profile updated successfully.")
+
+        return redirect("profile")
+
+    return render(request, "tracker/profile.html")
+from django.contrib.auth.decorators import login_required
+from .models import Transaction
+
+@login_required
+def reports(request):
+
+    transactions = Transaction.objects.filter(user=request.user)
+
+    income = transactions.filter(transaction_type="income")
+    expense = transactions.filter(transaction_type="expense")
+
+    total_income = sum(t.amount for t in income)
+    total_expense = sum(t.amount for t in expense)
+    balance = total_income - total_expense
+
+    return render(request, "tracker/reports.html", {
+        "transactions": transactions,
+        "total_income": total_income,
+        "total_expense": total_expense,
+        "balance": balance,
+    })
