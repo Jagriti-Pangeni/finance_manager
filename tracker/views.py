@@ -10,7 +10,11 @@ from django.contrib.auth import login
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from django.contrib.auth import logout
-
+import csv
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment
+from django.http import HttpResponse
+from django.db.models import Sum
 
 def home(request):
     return render(request, "tracker/homepage.html")
@@ -320,9 +324,12 @@ def add_expense(request):
             date=expense_date
         )
         messages.success(request, f"Expense of {amount} added successfully.")
-        
+        account.balance -= amount
+        account.save()
 
     return redirect('dashboard')
+
+
 @login_required(login_url="/login/")
 def add_category(request):
 
@@ -347,50 +354,178 @@ def add_category(request):
         messages.success(request, "Category added successfully.")
 
     return redirect("dashboard")
-@login_required(login_url="/login/")
-def profile(request):
 
-    profile, created = UserProfile.objects.get_or_create(
-        user=request.user
-    )
-
-    return render(request,"tracker/profile.html",{
-        "profile":profile
-    })
 
 @login_required(login_url="/login/")
 def profile(request):
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
 
     if request.method == "POST":
-
         request.user.username = request.POST.get("username")
         request.user.email = request.POST.get("email")
-
         request.user.save()
 
         messages.success(request, "Profile updated successfully.")
-
         return redirect("profile")
 
-    return render(request, "tracker/profile.html")
-from django.contrib.auth.decorators import login_required
-from .models import Transaction
-
-@login_required
-def reports(request):
-
-    transactions = Transaction.objects.filter(user=request.user)
-
-    income = transactions.filter(transaction_type="income")
-    expense = transactions.filter(transaction_type="expense")
-
-    total_income = sum(t.amount for t in income)
-    total_expense = sum(t.amount for t in expense)
-    balance = total_income - total_expense
-
-    return render(request, "tracker/reports.html", {
-        "transactions": transactions,
-        "total_income": total_income,
-        "total_expense": total_expense,
-        "balance": balance,
+    return render(request, "tracker/profile.html", {
+        "profile": profile
     })
+
+
+@login_required(login_url='/login/')
+def reports(request):
+    period = request.GET.get('period', 'monthly')
+    chart_type = request.GET.get('chart_type', 'bar')
+
+    today = date.today()
+
+    if period == 'daily':
+        start_date = today
+    elif period == 'weekly':
+        start_date = today - timedelta(days=7)
+    else:
+        start_date = today - timedelta(days=30)
+
+    transactions = Transaction.objects.filter(
+        user=request.user,
+        date__gte=start_date,
+        date__lte=today
+    )
+
+    expense_by_category = (
+        transactions.filter(transaction_type='expense')
+        .values('category__name')
+        .annotate(total=Sum('amount'))
+        .order_by('-total')
+    )
+
+    income_by_category = (
+        transactions.filter(transaction_type='income')
+        .values('category__name')
+        .annotate(total=Sum('amount'))
+        .order_by('-total')
+    )
+
+    total_income = transactions.filter(transaction_type='income').aggregate(Sum('amount'))['amount__sum'] or 0
+    total_expense = transactions.filter(transaction_type='expense').aggregate(Sum('amount'))['amount__sum'] or 0
+    net_balance = total_income - total_expense
+
+    expense_labels = [item['category__name'] for item in expense_by_category]
+    expense_data = [float(item['total']) for item in expense_by_category]
+    income_labels = [item['category__name'] for item in income_by_category]
+    income_data = [float(item['total']) for item in income_by_category]
+
+    return render(request, 'tracker/reports.html', {
+        'period': period,
+        'chart_type': chart_type,
+        'total_income': total_income,
+        'total_expense': total_expense,
+        'net_balance': net_balance,
+        'expense_labels': expense_labels,
+        'expense_data': expense_data,
+        'income_labels': income_labels,
+        'income_data': income_data,
+        'transactions': transactions.order_by('-date'),
+    })
+
+
+@login_required(login_url='/login/')
+def export_csv(request):
+    period = request.GET.get('period', 'monthly')
+    today = date.today()
+
+    if period == 'daily':
+        start_date = today
+    elif period == 'weekly':
+        start_date = today - timedelta(days=7)
+    else:
+        start_date = today - timedelta(days=30)
+
+    transactions = Transaction.objects.filter(
+        user=request.user,
+        date__gte=start_date,
+        date__lte=today
+    ).select_related('category')
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="report_{period}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['Date', 'Type', 'Category', 'Amount'])
+
+    for t in transactions:
+        writer.writerow([t.date, t.transaction_type.capitalize(), t.category.name, t.amount])
+
+    return response
+
+
+@login_required(login_url='/login/')
+def export_excel(request):
+    period = request.GET.get('period', 'monthly')
+    today = date.today()
+
+    if period == 'daily':
+        start_date = today
+    elif period == 'weekly':
+        start_date = today - timedelta(days=7)
+    else:
+        start_date = today - timedelta(days=30)
+
+    transactions = Transaction.objects.filter(
+        user=request.user,
+        date__gte=start_date,
+        date__lte=today
+    ).select_related('category')
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"{period.capitalize()} Report"
+
+    headers = ['Date', 'Type', 'Category', 'Amount']
+    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+
+    for row_num, t in enumerate(transactions, 2):
+        ws.cell(row=row_num, column=1, value=str(t.date))
+        ws.cell(row=row_num, column=2, value=t.transaction_type.capitalize())
+        ws.cell(row=row_num, column=3, value=t.category.name)
+        ws.cell(row=row_num, column=4, value=float(t.amount))
+
+        row_fill = PatternFill(
+            start_color="E2EFDA" if t.transaction_type == 'income' else "FFDDC1",
+            end_color="E2EFDA" if t.transaction_type == 'income' else "FFDDC1",
+            fill_type="solid"
+        )
+        for col in range(1, 5):
+            ws.cell(row=row_num, column=col).fill = row_fill
+
+    transaction_list = list(transactions)
+    total_income = sum(float(t.amount) for t in transaction_list if t.transaction_type == 'income')
+    total_expense = sum(float(t.amount) for t in transaction_list if t.transaction_type == 'expense')
+
+    last_row = len(transaction_list) + 3
+    ws.cell(row=last_row, column=3, value="Total Income").font = Font(bold=True)
+    ws.cell(row=last_row, column=4, value=total_income).font = Font(bold=True)
+    ws.cell(row=last_row + 1, column=3, value="Total Expense").font = Font(bold=True)
+    ws.cell(row=last_row + 1, column=4, value=total_expense).font = Font(bold=True)
+    ws.cell(row=last_row + 2, column=3, value="Net Balance").font = Font(bold=True)
+    ws.cell(row=last_row + 2, column=4, value=total_income - total_expense).font = Font(bold=True)
+
+    for col in ws.columns:
+        max_length = max(len(str(cell.value or "")) for cell in col)
+        ws.column_dimensions[col[0].column_letter].width = max_length + 4
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="report_{period}.xlsx"'
+    wb.save(response)
+
+    return response

@@ -12,7 +12,9 @@ urlpatterns = [
     path("add-income/", views.add_income, name="add_income"),
     path("add-expense/", views.add_expense, name="add_expense"),
     path("logout/", views.logout_user, name="logout"),
-   path("add-category/", views.add_category, name="add_category"),
-   path("profile/", views.profile, name="profile"),
-    path("reports/", views.reports, name="reports"),
+    path("add-category/", views.add_category, name="add_category"),
+    path("profile/", views.profile, name="profile"),
+    path('reports/',              views.reports,       name='reports'),
+    path('reports/export/csv/',   views.export_csv,    name='export_csv'),
+    path('reports/export/excel/', views.export_excel,  name='export_excel'),
 ]
